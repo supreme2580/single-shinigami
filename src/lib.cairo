@@ -67,36 +67,6 @@ use shinigami::starknet::secp256_trait::{Secp256Trait, Signature, is_valid_signa
 use shinigami::starknet::secp256_trait::{is_valid_signature};
 use shinigami::starknet::secp256k1::{Secp256k1Point};
 
-// File: ./combined_code.cairo
-
-
-// File: ./testing/src/lib.cairo
-mod tests {
-fn main() -> u32 {
-    fib(16)
-}
-
-fn fib(mut n: u32) -> u32 {
-    let mut a: u32 = 0;
-    let mut b: u32 = 1;
-    while n != 0 {
-        n = n - 1;
-        let temp = b;
-        b = a + b;
-        a = temp;
-    };
-    a
-}
-
-#[cfg(test)]
-    use super::fib;
-
-    #[test]
-    fn it_works() {
-        assert(fib(16) == 987, 'it works!');
-    }
-}
-
 // File: ./packages/cmds/src/main.cairo
 
 #[derive(Clone, Drop)]
