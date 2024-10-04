@@ -1,71 +1,9 @@
-use shinigami::core::dict::Felt252Dict;
-use shinigami::core::dict::{Felt252Dict, Felt252DictEntryTrait};
-use shinigami::core::num::traits::{Zero, One, BitSize};
-use shinigami::core::num::traits::{Zero, One};
-use shinigami::core::sha256::compute_sha256_byte_array;
-use shinigami::crate::compiler::CompilerImpl;
-use shinigami::crate::compiler::CompilerTraitImpl;
-use shinigami::crate::cond_stack::ConditionalStackTrait;
-use shinigami::crate::cond_stack::{ConditionalStack, ConditionalStackImpl};
-use shinigami::crate::engine::Engine;
-use shinigami::crate::engine::EngineInternalImpl;
-use shinigami::crate::engine::EngineTraitImpl;
-use shinigami::crate::engine::{Engine, EngineExtrasTrait};
-use shinigami::crate::engine::{Engine, EngineInternalImpl, EngineInternalTrait};
-use shinigami::crate::engine::{EngineImpl};
-use shinigami::crate::errors::Error;
-use shinigami::crate::maths::fast_power;
-use shinigami::crate::opcodes::Opcode;
-use shinigami::crate::opcodes::tests::utils::{
-use shinigami::crate::opcodes::tests::utils;
-use shinigami::crate::opcodes::utils;
-use shinigami::crate::opcodes::{flow, opcodes::Opcode};
-use shinigami::crate::opcodes::{utils, Opcode};
-use shinigami::crate::scriptflags::ScriptFlags;
-use shinigami::crate::scriptnum::ScriptNum;
-use shinigami::crate::signature::constants;
-use shinigami::crate::signature::sighash;
-use shinigami::crate::signature::signature::BaseSigVerifierTrait;
-use shinigami::crate::signature::signature;
-use shinigami::crate::signature::utils::{
-use shinigami::crate::signature::{sighash, constants};
-use shinigami::crate::stack::ScriptStackTrait;
-use shinigami::crate::stack::{ScriptStack, ScriptStackImpl};
-use shinigami::crate::transaction::Transaction;
-use shinigami::crate::transaction::TransactionTrait;
-use shinigami::crate::transaction::{
-use shinigami::crate::transaction::{Transaction, TransactionInput, TransactionOutput, OutPoint};
-use shinigami::crate::utils::{is_hex, is_number, is_string};
-use shinigami::crate::utxo::UTXO;
-use shinigami::crate::validate;
-use shinigami::crate::witness;
-use shinigami::shinigami_compiler::compiler::CompilerImpl;
-use shinigami::shinigami_engine::engine::EngineInternalImpl;
-use shinigami::shinigami_engine::opcodes::Opcode;
-use shinigami::shinigami_engine::scriptflags;
-use shinigami::shinigami_engine::scriptnum::ScriptNum;
-use shinigami::shinigami_engine::transaction::{TransactionImpl, TransactionTrait};
-use shinigami::shinigami_engine::utxo::UTXO;
-use shinigami::shinigami_engine::validate;
-use shinigami::shinigami_engine::witness;
-use shinigami::shinigami_utils::bit_shifts::shr;
-use shinigami::shinigami_utils::byte_array::byte_array_to_bool;
-use shinigami::shinigami_utils::byte_array::byte_array_to_felt252_be;
-use shinigami::shinigami_utils::byte_array::byte_array_to_felt252_le;
-use shinigami::shinigami_utils::byte_array::felt252_to_byte_array;
-use shinigami::shinigami_utils::byte_array::u256_from_byte_array_with_offset;
-use shinigami::shinigami_utils::byte_array::{byte_array_to_bool, byte_array_to_felt252_le};
-use shinigami::shinigami_utils::byte_array::{byte_array_value_at_le, byte_array_value_at_be, sub_byte_array};
-use shinigami::shinigami_utils::bytecode::bytecode_to_hex;
-use shinigami::shinigami_utils::bytecode::hex_to_bytecode;
-use shinigami::shinigami_utils::bytecode::int_size_in_bytes;
-use shinigami::shinigami_utils::hash::double_sha256;
-use shinigami::shinigami_utils::hash::sha256_byte_array;
-use shinigami::shinigami_utils::hex::int_to_hex;
-use shinigami::starknet::SyscallResultTrait;
-use shinigami::starknet::secp256_trait::{Secp256Trait, Signature, is_valid_signature};
-use shinigami::starknet::secp256_trait::{is_valid_signature};
-use shinigami::starknet::secp256k1::{Secp256k1Point};
+use core::dict::{Felt252Dict, Felt252DictEntryTrait};
+use core::num::traits::{Zero, One, BitSize};
+use core::sha256::compute_sha256_byte_array;
+use core::starknet::SyscallResultTrait;
+use core::starknet::secp256_trait::{Secp256Trait, Signature, is_valid_signature};
+use core::starknet::secp256k1::{Secp256k1Point};
 
 // File: ./packages/cmds/src/main.cairo
 
@@ -102,7 +40,7 @@ fn run_with_flags(input: InputDataWithFlags) -> Result<(), felt252> {
     let compiler = CompilerImpl::new();
     let script_sig = compiler.compile(input.ScriptSig)?;
     let tx = TransactionImpl::new_signed(script_sig);
-    let flags = scriptflags::parse_flags(input.Flags);
+    let flags = parse_flags(input.Flags);
     let mut engine = EngineInternalImpl::new(@script_pubkey, tx, 0, flags, 0)?;
     let _ = engine.execute()?;
     Result::Ok(())
@@ -120,9 +58,9 @@ fn run_with_witness(input: InputDataWithWitness) -> Result<(), felt252> {
     let script_pubkey = compiler.compile(input.ScriptPubKey)?;
     let compiler = CompilerImpl::new();
     let script_sig = compiler.compile(input.ScriptSig)?;
-    let witness = witness::parse_witness_input(input.Witness);
+    let witness = parse_witness_input(input.Witness);
     let tx = TransactionImpl::new_signed_witness(script_sig, witness);
-    let flags = scriptflags::parse_flags(input.Flags);
+    let flags = parse_flags(input.Flags);
     let mut engine = EngineInternalImpl::new(@script_pubkey, tx, 0, flags, 0)?;
     let _ = engine.execute()?;
     Result::Ok(())
@@ -253,7 +191,7 @@ fn run_raw_transaction(input: ValidateRawInput) -> u8 {
     println!("Running Bitcoin Script with raw transaction: '{}'", input.raw_transaction);
     let raw_transaction = hex_to_bytecode(@input.raw_transaction);
     let transaction = TransactionTrait::deserialize(raw_transaction);
-    let res = validate::validate_transaction(transaction, 0, input.utxo_hints);
+    let res = validate_transaction(transaction, 0, input.utxo_hints);
     match res {
         Result::Ok(_) => {
             println!("Execution successful");
@@ -648,12 +586,12 @@ pub fn double_sha256(byte: @ByteArray) -> u256 {
 
 // File: ./packages/utils/src/lib.cairo
 mod tests {}
-pub mod bit_shifts;
-pub mod byte_array;
-pub mod bytecode;
-pub mod hash;
-pub mod hex;
-pub mod maths;
+// pub mod bit_shifts;
+// pub mod byte_array;
+// pub mod bytecode;
+// pub mod hash;
+// pub mod hex;
+// pub mod maths;
 
 #[cfg(test)]
 
@@ -702,9 +640,9 @@ pub fn byte_array_err(err: felt252) -> ByteArray {
 }
 
 // File: ./packages/engine/src/signature/utils.cairo
-    Transaction, OutPoint, TransactionInput, TransactionOutput, EngineTransactionTrait,
-    EngineTransactionInputTrait, EngineTransactionOutputTrait
-};
+    // Transaction, OutPoint, TransactionInput, TransactionOutput, EngineTransactionTrait,
+    // EngineTransactionInputTrait, EngineTransactionOutputTrait
+// };
 
 // Removes `OP_CODESEPARATOR` opcodes from the `script`.
 // By removing this opcode, the script becomes suitable for hashing and signature verification.
@@ -756,7 +694,7 @@ pub fn transaction_procedure<
 >(
     ref transaction: T, index: u32, signature_script: ByteArray, hash_type: u32
 ) -> Transaction {
-    let hash_type_masked = hash_type & constants::SIG_HASH_MASK;
+    let hash_type_masked = hash_type & SIG_HASH_MASK;
     let mut transaction_inputs_clone = array![];
     for input in transaction
         .get_transaction_inputs() {
@@ -797,7 +735,7 @@ pub fn transaction_procedure<
         // TODO: Optimize this
         let mut temp_transaction_input: TransactionInput = transaction_input[i].clone();
 
-        if hash_type_masked == constants::SIG_HASH_SINGLE && i < index {
+        if hash_type_masked == SIG_HASH_SINGLE && i < index {
             processed_transaction_output
                 .append(TransactionOutput { value: -1, publickey_script: "", });
         }
@@ -813,12 +751,12 @@ pub fn transaction_procedure<
                     }
                 );
         } else {
-            if hash_type & constants::SIG_HASH_ANYONECANPAY != 0 {
+            if hash_type & SIG_HASH_ANYONECANPAY != 0 {
                 continue;
             }
             let mut temp_sequence = temp_transaction_input.sequence;
-            if hash_type_masked == constants::SIG_HASH_NONE
-                || hash_type_masked == constants::SIG_HASH_SINGLE {
+            if hash_type_masked == SIG_HASH_NONE
+                || hash_type_masked == SIG_HASH_SINGLE {
                 temp_sequence = 0;
             }
             processed_transaction_input
@@ -837,11 +775,11 @@ pub fn transaction_procedure<
 
     transaction_copy.transaction_inputs = processed_transaction_input;
 
-    if hash_type_masked == constants::SIG_HASH_NONE {
+    if hash_type_masked == SIG_HASH_NONE {
         transaction_copy.transaction_outputs = ArrayTrait::<TransactionOutput>::new();
     }
 
-    if hash_type_masked == constants::SIG_HASH_SINGLE {
+    if hash_type_masked == SIG_HASH_SINGLE {
         transaction_copy.transaction_outputs = processed_transaction_output;
     }
 
@@ -855,7 +793,7 @@ pub fn transaction_procedure<
 // Thus, a Pay-to-Witness-Public-Key-Hash script is of the form:
 // `OP_0 OP_DATA_20 <20-byte public key hash>`
 pub fn is_witness_pub_key_hash(script: @ByteArray) -> bool {
-    if script.len() == constants::WITNESS_V0_PUB_KEY_HASH_LEN
+    if script.len() == WITNESS_V0_PUB_KEY_HASH_LEN
         && script[0] == Opcode::OP_0
         && script[1] == Opcode::OP_DATA_20 {
         return true;
@@ -864,11 +802,11 @@ pub fn is_witness_pub_key_hash(script: @ByteArray) -> bool {
 }
 
 // File: ./packages/engine/src/signature/sighash.cairo
-    Transaction, TransactionTrait, TransactionInput, TransactionOutput, EngineTransactionTrait,
-    EngineTransactionInputTrait, EngineTransactionOutputTrait
-};
-    remove_opcodeseparator, transaction_procedure, is_witness_pub_key_hash
-};
+//     Transaction, TransactionTrait, TransactionInput, TransactionOutput, EngineTransactionTrait,
+//     EngineTransactionInputTrait, EngineTransactionOutputTrait
+// };
+//     remove_opcodeseparator, transaction_procedure, is_witness_pub_key_hash
+// };
 
 // Calculates the signature hash for specified transaction data and hash type.
 pub fn calc_signature_hash<
@@ -891,7 +829,7 @@ pub fn calc_signature_hash<
     // The original Satoshi client gave a signature hash of 0x01 in cases where the input index
     // was out of bounds. This buggy/dangerous behavior is part of the consensus rules,
     // and would require a hard fork to fix.
-    if hash_type & constants::SIG_HASH_MASK == constants::SIG_HASH_SINGLE
+    if hash_type & SIG_HASH_MASK == SIG_HASH_SINGLE
         && tx_idx >= transaction_outputs_len {
         return 0x01;
     }
@@ -915,7 +853,7 @@ pub fn calc_witness_transaction_hash(
     sub_script: @ByteArray, hash_type: u32, ref transaction: Transaction, index: u32, amount: i64
 ) -> u256 {
     let transaction_outputs_len: usize = transaction.transaction_outputs.len();
-    if hash_type & constants::SIG_HASH_MASK == constants::SIG_HASH_SINGLE
+    if hash_type & SIG_HASH_MASK == SIG_HASH_SINGLE
         && index > transaction_outputs_len {
         return 0x01;
     }
@@ -944,8 +882,8 @@ pub fn calc_witness_transaction_hash(
     };
     // Serialize each output if not using SIG_HASH_SINGLE or SIG_HASH_NONE else serialize only the
     // relevant output.
-    if hash_type & constants::SIG_HASH_SINGLE != constants::SIG_HASH_SINGLE
-        && hash_type & constants::SIG_HASH_NONE != constants::SIG_HASH_NONE {
+    if hash_type & SIG_HASH_SINGLE != SIG_HASH_SINGLE
+        && hash_type & SIG_HASH_NONE != SIG_HASH_NONE {
         let output_len: usize = transaction.transaction_outputs.len();
 
         i = 0;
@@ -961,7 +899,7 @@ pub fn calc_witness_transaction_hash(
 
             i += 1;
         };
-    } else if hash_type & constants::SIG_HASH_SINGLE == constants::SIG_HASH_SINGLE {
+    } else if hash_type & SIG_HASH_SINGLE == SIG_HASH_SINGLE {
         if index < transaction.transaction_outputs.len() {
             let output: @TransactionOutput = transaction.transaction_outputs.at(index);
             let value: i64 = *output.value;
@@ -974,21 +912,21 @@ pub fn calc_witness_transaction_hash(
         }
     }
     let mut hash_prevouts: u256 = 0;
-    if hash_type & constants::SIG_HASH_ANYONECANPAY != constants::SIG_HASH_ANYONECANPAY {
+    if hash_type & SIG_HASH_ANYONECANPAY != SIG_HASH_ANYONECANPAY {
         hash_prevouts = double_sha256(@input_byte);
     }
 
     let mut hash_sequence: u256 = 0;
-    if hash_type & constants::SIG_HASH_ANYONECANPAY != constants::SIG_HASH_ANYONECANPAY
-        && hash_type & constants::SIG_HASH_SINGLE != constants::SIG_HASH_SINGLE
-        && hash_type & constants::SIG_HASH_NONE != constants::SIG_HASH_NONE {
+    if hash_type & SIG_HASH_ANYONECANPAY != SIG_HASH_ANYONECANPAY
+        && hash_type & SIG_HASH_SINGLE != SIG_HASH_SINGLE
+        && hash_type & SIG_HASH_NONE != SIG_HASH_NONE {
         hash_sequence = double_sha256(@sequence_byte);
     }
 
     let mut hash_outputs: u256 = 0;
-    if hash_type & constants::SIG_HASH_ANYONECANPAY == constants::SIG_HASH_ANYONECANPAY
-        || hash_type & constants::SIG_HASH_SINGLE == constants::SIG_HASH_SINGLE
-        || hash_type & constants::SIG_HASH_ALL == constants::SIG_HASH_ALL {
+    if hash_type & SIG_HASH_ANYONECANPAY == SIG_HASH_ANYONECANPAY
+        || hash_type & SIG_HASH_SINGLE == SIG_HASH_SINGLE
+        || hash_type & SIG_HASH_ALL == SIG_HASH_ALL {
         hash_sequence = double_sha256(@output_byte);
     }
 
@@ -1036,8 +974,8 @@ pub fn calc_witness_transaction_hash(
 }
 
 // File: ./packages/engine/src/signature/signature.cairo
-    EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
-};
+//     EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
+// };
 
 //`BaseSigVerifier` is used to verify ECDSA signatures encoded in DER or BER format (pre-SegWit sig)
 #[derive(Drop)]
@@ -1087,7 +1025,7 @@ impl BaseSigVerifierImpl<
 
     // TODO: add signature cache mechanism for optimization
     fn verify(ref self: BaseSigVerifier, ref vm: Engine<T>) -> bool {
-        let sig_hash: u256 = sighash::calc_signature_hash(
+        let sig_hash: u256 = calc_signature_hash(
             @self.sub_script, self.hash_type, ref vm.transaction, vm.tx_idx
         );
 
@@ -1125,11 +1063,11 @@ pub fn check_hash_type_encoding<T, +Drop<T>>(
         return Result::Ok(());
     }
 
-    if hash_type > constants::SIG_HASH_ANYONECANPAY {
-        hash_type -= constants::SIG_HASH_ANYONECANPAY;
+    if hash_type > SIG_HASH_ANYONECANPAY {
+        hash_type -= SIG_HASH_ANYONECANPAY;
     }
 
-    if hash_type < constants::SIG_HASH_ALL || hash_type > constants::SIG_HASH_SINGLE {
+    if hash_type < SIG_HASH_ALL || hash_type > SIG_HASH_SINGLE {
         return Result::Err('invalid hash type');
     }
 
@@ -1170,13 +1108,13 @@ pub fn check_signature_encoding<T, +Drop<T>>(
         return Result::Err('invalid sig fmt: empty sig');
     }
     // Calculate the actual length of the signature, excluding the hash type.
-    let sig_len = sig_bytes_len - constants::HASH_TYPE_LEN;
+    let sig_len = sig_bytes_len - HASH_TYPE_LEN;
     // Check if the signature is too short.
-    if sig_len < constants::MIN_SIG_LEN {
+    if sig_len < MIN_SIG_LEN {
         return Result::Err('invalid sig fmt: too short');
     }
     // Check if the signature is too long.
-    if sig_len > constants::MAX_SIG_LEN {
+    if sig_len > MAX_SIG_LEN {
         return Result::Err('invalid sig fmt: too long');
     }
     // Ensure the signature starts with the correct ASN.1 sequence identifier.
@@ -1245,7 +1183,7 @@ pub fn check_signature_encoding<T, +Drop<T>>(
 
         let (half_order_high_upper, half_order_high_lower) = DivRem::div_rem(half_order.high, 2);
         let carry = half_order_high_lower;
-        half_order.low = (half_order.low / 2) + (carry * (constants::MAX_U128 / 2 + 1));
+        half_order.low = (half_order.low / 2) + (carry * (MAX_U128 / 2 + 1));
         half_order.high = half_order_high_upper;
 
         if s_value > half_order {
@@ -1338,7 +1276,7 @@ pub fn parse_pub_key(pk_bytes: @ByteArray) -> Secp256k1Point {
 // This function extracts the `r` and `s` values from a DER-encoded ECDSA signature (`sig_bytes`).
 // The function performs various checks to ensure the integrity and validity of the signature.
 pub fn parse_signature(sig_bytes: @ByteArray) -> Result<Signature, felt252> {
-    let mut sig_len: usize = sig_bytes.len() - constants::HASH_TYPE_LEN;
+    let mut sig_len: usize = sig_bytes.len() - HASH_TYPE_LEN;
     let mut r_len: usize = sig_bytes[3].into();
     let mut s_len: usize = sig_bytes[r_len + 5].into();
     let mut r_offset = 4;
@@ -1520,7 +1458,7 @@ fn test_compressed_pubkey() {
     let transaction = TransactionTrait::deserialize(raw_transaction);
     let utxo_hints = array![prev_out];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -1538,7 +1476,7 @@ fn test_block_181_tx_mainnet() {
     let transaction = TransactionTrait::deserialize(raw_transaction);
     let utxo_hints = array![prev_out];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -1556,7 +1494,7 @@ fn test_block_182_tx_mainnet() {
     let transaction = TransactionTrait::deserialize(raw_transaction);
     let utxo_hints = array![prev_out];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -1585,7 +1523,7 @@ fn test_block_496_tx_mainnet() {
     let transaction = TransactionTrait::deserialize(raw_transaction);
     let utxo_hints = array![prev_out, prev_out2, prev_out3];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -1810,7 +1748,7 @@ fn test_validate_transaction() {
     let utxo_hints = array![prev_out];
 
     // Run Shinigami and validate the transaction execution
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -1973,7 +1911,7 @@ fn test_p2pkh_transaction() {
     };
     let utxo_hints = array![prevout_1, prevout_2];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -2013,7 +1951,7 @@ fn test_p2pkh_transaction_spend() {
     let utxo_hints = array![prev_out0, prev_out1, prev_out2];
 
     // Run Shinigami and validate the transaction execution
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -2038,7 +1976,7 @@ fn test_block_770000_p2pkh_transaction() {
     };
     let utxo_hints = array![prevout];
 
-    let res = validate::validate_transaction(transaction, 0, utxo_hints);
+    let res = validate_transaction(transaction, 0, utxo_hints);
     assert!(res.is_ok(), "Transaction validation failed");
 }
 
@@ -2775,8 +2713,8 @@ pub mod transaction;
 }
 
 // File: ./packages/engine/src/engine.cairo
-    Transaction, EngineTransactionInputTrait, EngineTransactionOutputTrait, EngineTransactionTrait
-};
+//     Transaction, EngineTransactionInputTrait, EngineTransactionOutputTrait, EngineTransactionTrait
+// };
 
 // SigCache implements an Schnorr+ECDSA signature verification cache. Only valid signatures will be
 // added to the cache.
@@ -3093,7 +3031,7 @@ pub impl EngineInternalImpl of EngineInternalTrait {
             }
 
             let mut witness_program: ByteArray = "";
-            if witness::is_witness_program(script_pubkey) {
+            if is_witness_program(script_pubkey) {
                 if script_sig.len() != 0 {
                     return Result::Err('Engine::new: witness w/ sig');
                 }
@@ -3110,7 +3048,7 @@ pub impl EngineInternalImpl of EngineInternalTrait {
                         i += 1;
                     };
                     if Opcode::is_canonical_push(first_elem, @remaining)
-                        && witness::is_witness_program(@remaining) {
+                        && is_witness_program(@remaining) {
                         witness_program = remaining;
                     } else {
                         return Result::Err('Engine::new: sig malleability');
@@ -3121,7 +3059,7 @@ pub impl EngineInternalImpl of EngineInternalTrait {
             }
 
             if witness_program.len() != 0 {
-                let (witness_version, witness_program) = witness::parse_witness_program(
+                let (witness_version, witness_program) = parse_witness_program(
                     @witness_program
                 )?;
                 engine.witness_version = witness_version;
@@ -3247,7 +3185,7 @@ pub impl EngineInternalImpl of EngineInternalTrait {
             return Result::Err(illegal_opcode.unwrap_err());
         }
 
-        if !self.cond_stack.branch_executing() && !flow::is_branching_opcode(opcode) {
+        if !self.cond_stack.branch_executing() && !is_branching_opcode(opcode) {
             if Opcode::is_data_opcode(opcode) {
                 let opcode_32: u32 = opcode.into();
                 self.opcode_idx += opcode_32 + 1;
@@ -3329,7 +3267,7 @@ pub impl EngineInternalImpl of EngineInternalTrait {
                     }
                 }
 
-                if !self.cond_stack.branch_executing() && !flow::is_branching_opcode(opcode) {
+                if !self.cond_stack.branch_executing() && !is_branching_opcode(opcode) {
                     if Opcode::is_data_opcode(opcode) {
                         let opcode_32: u32 = opcode.into();
                         self.opcode_idx += opcode_32 + 1;
@@ -3754,8 +3692,8 @@ pub fn opcode_disabled<T>(ref engine: Engine<T>) -> Result<(), felt252> {
 }
 
 // File: ./packages/engine/src/opcodes/locktime.cairo
-    EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
-};
+//     EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
+// };
 
 const LOCKTIME_THRESHOLD: u32 = 500000000; // Nov 5 00:53:20 1985 UTC
 const SEQUENCE_LOCKTIME_DISABLED: u32 = 0x80000000;
@@ -3897,8 +3835,8 @@ pub fn opcode_checksequenceverify<
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_constants.cairo
-    test_compile_and_run, test_compile_and_run_err, check_expected_dstack, check_dstack_size
-};
+//     test_compile_and_run, test_compile_and_run_err, check_expected_dstack, check_dstack_size
+// };
 
 fn test_op_n(value: u8) {
     let program = format!("OP_{}", value);
@@ -4095,10 +4033,10 @@ fn test_op_pushdata4_in_if() {
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_crypto.cairo
-    test_compile_and_run, check_expected_dstack, check_dstack_size,
-    test_compile_and_run_with_tx_flags_err, mock_transaction_legacy_p2ms,
-    test_compile_and_run_with_tx_err, test_compile_and_run_with_tx, mock_transaction_legacy_p2pkh
-};
+//     test_compile_and_run, check_expected_dstack, check_dstack_size,
+//     test_compile_and_run_with_tx_flags_err, mock_transaction_legacy_p2ms,
+//     test_compile_and_run_with_tx_err, test_compile_and_run_with_tx, mock_transaction_legacy_p2pkh
+// };
 
 #[test]
 fn test_opcode_sha256_1() {
@@ -4797,19 +4735,19 @@ pub fn mock_transaction_legacy_sequence_v2(script_sig: ByteArray, sequence: u32)
 #[test]
 fn test_op_equal() {
     let program = "OP_1 OP_1 OP_EQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_equal_false() {
     let program = "OP_0 OP_1 OP_EQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_reserved.cairo
@@ -4817,58 +4755,58 @@ fn test_op_equal_false() {
 #[test]
 fn test_op_reserved() {
     let program = "OP_RESERVED";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_reserved1() {
     let program = "OP_RESERVED1";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 
 #[test]
 fn test_op_reserved2() {
     let program = "OP_RESERVED2";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_ver() {
     let program = "OP_VER";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_verif() {
     let program = "OP_VERIF";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_vernotif() {
     let program = "OP_VERNOTIF";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_verif_if() {
     let program = "OP_0 OP_IF OP_VERIF OP_ENDIF OP_1";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_vernotif_if() {
     let program = "OP_0 OP_IF OP_VERNOTIF OP_ENDIF OP_1";
-    let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_RESERVED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::OPCODE_RESERVED);
+    check_dstack_size(ref engine, 0);
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_disabled.cairo
@@ -4899,10 +4837,10 @@ fn test_op_code_disabled() {
     let disabled_opcodes = disabled_opcodes();
     let mut i: usize = 0;
     while i != disabled_opcodes.len() {
-        let mut engine = utils::test_compile_and_run_err(
+        let mut engine = test_compile_and_run_err(
             disabled_opcodes.at(i).clone(), Error::OPCODE_DISABLED
         );
-        utils::check_dstack_size(ref engine, 0);
+        check_dstack_size(ref engine, 0);
         i += 1;
     }
 }
@@ -4915,8 +4853,8 @@ fn test_disabled_opcodes_if_block() {
         let program = format!(
             "OP_1 OP_IF {} OP_ELSE OP_DROP OP_ENDIF", disabled_opcodes.at(i).clone()
         );
-        let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_DISABLED);
-        utils::check_dstack_size(ref engine, 0);
+        let mut engine = test_compile_and_run_err(program, Error::OPCODE_DISABLED);
+        check_dstack_size(ref engine, 0);
         i += 1;
     }
 }
@@ -4929,8 +4867,8 @@ fn test_disabled_opcodes_else_block() {
         let program = format!(
             "OP_0 OP_IF OP_DROP OP_ELSE {} OP_ENDIF", disabled_opcodes.at(i).clone()
         );
-        let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_DISABLED);
-        utils::check_dstack_size(ref engine, 0);
+        let mut engine = test_compile_and_run_err(program, Error::OPCODE_DISABLED);
+        check_dstack_size(ref engine, 0);
         i += 1;
     }
 }
@@ -4944,8 +4882,8 @@ fn test_disabled_opcode_in_unexecd_if_block() {
         let program = format!(
             "OP_0 OP_IF {} OP_ELSE OP_DROP OP_ENDIF", disabled_opcodes.at(i).clone()
         );
-        let mut engine = utils::test_compile_and_run_err(program, Error::OPCODE_DISABLED);
-        utils::check_dstack_size(ref engine, 0);
+        let mut engine = test_compile_and_run_err(program, Error::OPCODE_DISABLED);
+        check_dstack_size(ref engine, 0);
         i += 1;
     }
 }
@@ -4956,35 +4894,35 @@ fn test_disabled_opcode_in_unexecd_if_block() {
 fn test_opcode_checklocktime() {
     let mut program =
         "OP_DATA_4 0x8036BE26 OP_CHECKLOCKTIMEVERIFY"; // 0x8036BE26 == 650000000 in ScriptNum
-    let mut tx = utils::mock_transaction_legacy_locktime("", 700000000);
+    let mut tx = mock_transaction_legacy_locktime("", 700000000);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckLockTimeVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags(program, tx, flags);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx_flags(program, tx, flags);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checklocktime_unsatisfied_fail() {
     let mut program =
         "OP_DATA_4 0x8036BE26 OP_CHECKLOCKTIMEVERIFY"; // 0x8036BE26 == 650000000 in ScriptNum
-    let mut tx = utils::mock_transaction_legacy_locktime("", 600000000);
+    let mut tx = mock_transaction_legacy_locktime("", 600000000);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckLockTimeVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::UNSATISFIED_LOCKTIME
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checklocktime_block() {
     let program = "OP_16 OP_CHECKLOCKTIMEVERIFY";
 
-    let mut tx = utils::mock_transaction_legacy_locktime("", 20);
+    let mut tx = mock_transaction_legacy_locktime("", 20);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckLockTimeVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags(program, tx, flags);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx_flags(program, tx, flags);
+    check_dstack_size(ref engine, 1);
 }
 
 // This test has value who failed with opcdoe checklocktimeverify but necessary flag is not set
@@ -4993,11 +4931,11 @@ fn test_opcode_checklocktime_block() {
 fn test_opcode_checklocktime_as_op_nop() {
     let program = "OP_16 OP_CHECKLOCKTIMEVERIFY";
 
-    let mut tx = utils::mock_transaction_legacy_locktime("", 10);
+    let mut tx = mock_transaction_legacy_locktime("", 10);
 
     // Running without the flag 'ScriptVerifyCheckLockTimeVerify' result as OP_NOP
-    let mut engine = utils::test_compile_and_run_with_tx(program, tx);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx(program, tx);
+    check_dstack_size(ref engine, 1);
 }
 
 // The 'ScriptVerifyCheckLockTimeVerify' flag isn't set but 'ScriptDiscourageUpgradable' is. Should
@@ -5006,15 +4944,15 @@ fn test_opcode_checklocktime_as_op_nop() {
 fn test_opcode_checklocktime_as_op_nop_fail() {
     let program = "OP_16 OP_CHECKLOCKTIMEVERIFY";
 
-    let mut tx = utils::mock_transaction_legacy_locktime("", 10);
+    let mut tx = mock_transaction_legacy_locktime("", 10);
 
     // Running without the flag 'ScriptVerifyCheckLockTimeVerify' result as OP_NOP behavior
     // 'ScriptDiscourageUpgradableNops' prevents to have OP_NOP behavior
     let flags: u32 = ScriptFlags::ScriptDiscourageUpgradableNops.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::SCRIPT_DISCOURAGE_UPGRADABLE_NOPS
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
@@ -5022,49 +4960,49 @@ fn test_opcode_checklocktime_max_sequence_fail() {
     let mut program =
         "OP_DATA_4 0x8036BE26 OP_CHECKLOCKTIMEVERIFY"; // 0x8036BE26 == 650000000 in ScriptNum
     // By default the sequence field is set to 0xFFFFFFFF
-    let mut tx = utils::mock_transaction("");
+    let mut tx = mock_transaction("");
     tx.locktime = 700000000;
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckLockTimeVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::FINALIZED_TX_CLTV
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_block() {
     let mut program =
         "OP_DATA_4 0x40000000 OP_CHECKSEQUENCEVERIFY"; // 0x40000000 == 64 in ScriptNum
-    let tx = utils::mock_transaction_legacy_sequence_v2("", 2048);
+    let tx = mock_transaction_legacy_sequence_v2("", 2048);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags(program, tx, flags);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx_flags(program, tx, flags);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_time() {
     let mut program =
         "OP_DATA_4 0x00004000 OP_CHECKSEQUENCEVERIFY"; // 0x00004000 == 4194304 in ScriptNum
-    let tx = utils::mock_transaction_legacy_sequence_v2("", 5000000);
+    let tx = mock_transaction_legacy_sequence_v2("", 5000000);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags(program, tx, flags);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx_flags(program, tx, flags);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_fail() {
     let mut program =
         "OP_DATA_4 0x40400000 OP_CHECKSEQUENCEVERIFY"; // 0x40400000 == 16448 in ScriptNum
-    let tx = utils::mock_transaction_legacy_sequence_v2("", 2048);
+    let tx = mock_transaction_legacy_sequence_v2("", 2048);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::UNSATISFIED_LOCKTIME
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 // This test has value who failed with opcdoe checksequenceverify but necessary flag is not set so
@@ -5073,11 +5011,11 @@ fn test_opcode_checksequence_fail() {
 fn test_opcode_checksequence_as_op_nop() {
     let mut program =
         "OP_DATA_4 0x40400000 OP_CHECKSEQUENCEVERIFY"; // 0x40400000 == 16448 in ScriptNum
-    let tx = utils::mock_transaction_legacy_sequence_v2("", 2048);
+    let tx = mock_transaction_legacy_sequence_v2("", 2048);
 
     // Running without the flag 'ScriptVerifyCheckLockTimeVerify' result as OP_NOP
-    let mut engine = utils::test_compile_and_run_with_tx(program, tx);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx(program, tx);
+    check_dstack_size(ref engine, 1);
 }
 
 // The 'ScriptVerifyCheckSequenceVerify' flag isn't set but 'ScriptDiscourageUpgradable' is. Should
@@ -5086,53 +5024,53 @@ fn test_opcode_checksequence_as_op_nop() {
 fn test_opcode_checksequence_as_op_nop_fail() {
     let mut program =
         "OP_DATA_4 0x40400000 OP_CHECKSEQUENCEVERIFY"; // 0x40400000 == 16448 in ScriptNum
-    let mut tx = utils::mock_transaction_legacy_sequence_v2("", 2048);
+    let mut tx = mock_transaction_legacy_sequence_v2("", 2048);
 
     // Running without the flag 'ScriptVerifyCheckSequenceVerify' result as OP_NOP behavior
     // 'ScriptDiscourageUpgradableNops' prevents to have OP_NOP behavior
     let flags: u32 = ScriptFlags::ScriptDiscourageUpgradableNops.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::SCRIPT_DISCOURAGE_UPGRADABLE_NOPS
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_tx_version_fail() {
     let mut program =
         "OP_DATA_4 0x40000000 OP_CHECKSEQUENCEVERIFY"; // 0x40000000 == 64 in ScriptNum
-    let mut tx = utils::mock_transaction("");
+    let mut tx = mock_transaction("");
 
     // Running with tx v1
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::INVALID_TX_VERSION
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_disabled_bit_stack() {
     let mut program = "OP_DATA_4 0x80000000 OP_CHECKSEQUENCEVERIFY";
-    let tx = utils::mock_transaction_legacy_sequence_v2("", 2048);
+    let tx = mock_transaction_legacy_sequence_v2("", 2048);
 
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags(program, tx, flags);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_with_tx_flags(program, tx, flags);
+    check_dstack_size(ref engine, 1);
 }
 
 #[test]
 fn test_opcode_checksequence_disabled_bit_tx_fail() {
     let mut program =
         "OP_DATA_4 0x00004000 OP_CHECKSEQUENCEVERIFY"; // 0x00004000 == 4194304 in ScriptNum
-    let mut tx = utils::mock_transaction_legacy_sequence_v2("", 2147483648);
+    let mut tx = mock_transaction_legacy_sequence_v2("", 2147483648);
 
     // Run with tx v1
     let flags: u32 = ScriptFlags::ScriptVerifyCheckSequenceVerify.into();
-    let mut engine = utils::test_compile_and_run_with_tx_flags_err(
+    let mut engine = test_compile_and_run_with_tx_flags_err(
         program, tx, flags, Error::UNSATISFIED_LOCKTIME
     );
-    utils::check_dstack_size(ref engine, 1);
+    check_dstack_size(ref engine, 1);
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_flow.cairo
@@ -5140,66 +5078,66 @@ fn test_opcode_checksequence_disabled_bit_tx_fail() {
 #[test]
 fn test_op_nop() {
     let program = "OP_NOP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_nop_with_add() {
     let program = "OP_1 OP_1 OP_ADD OP_NOP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 fn test_op_if_false() {
     let program = "OP_0 OP_IF OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_if_true() {
     let program = "OP_1 OP_IF OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_notif_false() {
     let program = "OP_0 OP_NOTIF OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_notif_true() {
     let program = "OP_1 OP_NOTIF OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_else_false() {
     let program = "OP_0 OP_IF OP_0 OP_ELSE OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_else_true() {
     let program = "OP_1 OP_IF OP_0 OP_ELSE OP_1 OP_ENDIF";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 // TODO: No end_if, ...
@@ -5208,35 +5146,35 @@ fn test_op_else_true() {
 #[test]
 fn test_op_verify_empty_stack() {
     let program = "OP_VERIFY";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_verify_true() {
     let program = "OP_TRUE OP_VERIFY";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_verify_false() {
     let program = "OP_0 OP_VERIFY";
-    let mut engine = utils::test_compile_and_run_err(program, Error::VERIFY_FAILED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::VERIFY_FAILED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_return() {
     let program = "OP_RETURN OP_1";
-    let mut engine = utils::test_compile_and_run_err(program, 'opcode_return: returned early');
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, 'opcode_return: returned early');
+    check_dstack_size(ref engine, 0);
 }
 
 fn test_op_nop_x(value: u8) {
     let program = format!("OP_NOP{}", value);
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
@@ -5254,10 +5192,10 @@ fn test_op_nop_x_all() {
 #[test]
 fn test_data_op_in_if() {
     let program = "OP_0 OP_IF OP_DATA_1 0x81 OP_ENDIF OP_1";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_stack.cairo
@@ -5265,115 +5203,115 @@ fn test_data_op_in_if() {
 #[test]
 fn test_op_toaltstack() {
     let program = "OP_1 OP_TOALTSTACK";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
     // TODO: Do check of altstack before exiting the program
-    utils::check_astack_size(ref engine, 0);
+    check_astack_size(ref engine, 0);
     let expected_astack = array![];
-    utils::check_expected_astack(ref engine, expected_astack.span());
+    check_expected_astack(ref engine, expected_astack.span());
 }
 
 #[test]
 fn test_op_toaltstack_underflow() {
     let program = "OP_TOALTSTACK";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
-    utils::check_dstack_size(ref engine, 0);
-    utils::check_astack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
+    check_dstack_size(ref engine, 0);
+    check_astack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_ifdup_zero_top_stack() {
     let program = "OP_0 OP_IFDUP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_dstack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_ifdup_non_zero_top_stack() {
     let program = "OP_1 OP_IFDUP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 2);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_ifdup_multi_non_zero_top_stack() {
     let program = "OP_0 OP_1 OP_2 OP_ADD OP_IFDUP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(0), ScriptNum::wrap(3), ScriptNum::wrap(3)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_depth_empty_stack() {
     let program = "OP_DEPTH";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_dstack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_depth_one_item() {
     let program = "OP_1 OP_DEPTH";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 2);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_depth_multiple_items() {
     let program = "OP_1 OP_1 OP_ADD OP_1 OP_DEPTH";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(2), ScriptNum::wrap(1), ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_drop() {
     let program = "OP_1 OP_2 OP_DROP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_dstack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_drop_underflow() {
     let program = "OP_DROP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_dup() {
     let program = "OP_1 OP_2 OP_DUP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(2), ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_swap() {
     let program = "OP_1 OP_2 OP_3 OP_SWAP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(3), ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_swap_mid() {
     let program = "OP_1 OP_2 OP_3 OP_SWAP OP_4 OP_5";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 5);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 5);
     let expected_dstack = array![
         ScriptNum::wrap(1),
         ScriptNum::wrap(3),
@@ -5381,48 +5319,48 @@ fn test_op_swap_mid() {
         ScriptNum::wrap(4),
         ScriptNum::wrap(5)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_opcode_tuck() {
     let program = "OP_1 OP_2 OP_TUCK";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(2), ScriptNum::wrap(1), ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_2drop() {
     let program = "OP_1 OP_2 OP_2DROP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_2drop_underflow() {
     let program = "OP_1 OP_2DROP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_2dup() {
     let program = "OP_1 OP_2 OP_2DUP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 4);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 4);
     let expected_dstack = array![
         ScriptNum::wrap(1), ScriptNum::wrap(2), ScriptNum::wrap(1), ScriptNum::wrap(2)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_3dup() {
     let program = "OP_1 OP_2 OP_3 OP_3DUP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 6);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 6);
     let expected_dstack = array![
         ScriptNum::wrap(1),
         ScriptNum::wrap(2),
@@ -5431,25 +5369,25 @@ fn test_op_3dup() {
         ScriptNum::wrap(2),
         ScriptNum::wrap(3)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_2swap() {
     let program = "OP_1 OP_2 OP_3 OP_4 OP_2SWAP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 4);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 4);
     let expected_dstack = array![
         ScriptNum::wrap(3), ScriptNum::wrap(4), ScriptNum::wrap(1), ScriptNum::wrap(2)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_2swap_mid() {
     let program = "OP_1 OP_2 OP_3 OP_4 OP_2SWAP OP_5 OP_6";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 6);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 6);
     let expected_dstack = array![
         ScriptNum::wrap(3),
         ScriptNum::wrap(4),
@@ -5458,74 +5396,74 @@ fn test_op_2swap_mid() {
         ScriptNum::wrap(5),
         ScriptNum::wrap(6)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_2swap_underflow() {
     let program = "OP_1 OP_2 OP_3 OP_2SWAP";
-    let _ = utils::test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
+    let _ = test_compile_and_run_err(program, Error::STACK_UNDERFLOW);
 }
 
 #[test]
 fn test_op_nip() {
     let program = "OP_1 OP_2 OP_NIP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_dstack = array![ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_pick() {
     let program = "OP_2 OP_0 OP_PICK";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 2);
     let expected_dstack = array![ScriptNum::wrap(2), ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_pick_2() {
     let program = "OP_1 OP_2 OP_3 OP_2 OP_PICK";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 4);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 4);
     let expected_dstack = array![
         ScriptNum::wrap(1), ScriptNum::wrap(2), ScriptNum::wrap(3), ScriptNum::wrap(1)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_nip_multi() {
     let program = "OP_1 OP_2 OP_3 OP_NIP";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 2);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(3)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_nip_out_of_bounds() {
     let program = "OP_NIP";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_rot() {
     let program = "OP_1 OP_2 OP_3 OP_ROT";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(2), ScriptNum::wrap(3), ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_2rot() {
     let program = "OP_1 OP_2 OP_3 OP_4 OP_5 OP_6 OP_2ROT";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 6);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 6);
     let expected_dstack = array![
         ScriptNum::wrap(3),
         ScriptNum::wrap(4),
@@ -5534,21 +5472,21 @@ fn test_op_2rot() {
         ScriptNum::wrap(1),
         ScriptNum::wrap(2)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_rot_insufficient_items() {
     let program = "OP_1 OP_2 OP_ROT";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
+    check_dstack_size(ref engine, 2);
 }
 
 #[test]
 fn test_op_2rot_insufficient_items() {
     let program = "OP_1 OP_2 OP_3 OP_4 OP_5 OP_2ROT";
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
-    utils::check_dstack_size(ref engine, 5);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_OUT_OF_RANGE);
+    check_dstack_size(ref engine, 5);
 }
 
 #[test]
@@ -5560,9 +5498,9 @@ fn test_max_stack() {
         program.append(@op_1_string);
         index += 1;
     };
-    let mut engine = utils::test_compile_and_run(program);
+    let mut engine = test_compile_and_run(program);
 
-    utils::check_dstack_size(ref engine, 1000);
+    check_dstack_size(ref engine, 1000);
 }
 
 #[test]
@@ -5575,42 +5513,42 @@ fn test_exceed_stack() {
         index += 1;
     };
 
-    let mut engine = utils::test_compile_and_run_err(program, Error::STACK_OVERFLOW);
+    let mut engine = test_compile_and_run_err(program, Error::STACK_OVERFLOW);
 
-    utils::check_dstack_size(ref engine, 1001);
+    check_dstack_size(ref engine, 1001);
 }
 
 #[test]
 fn test_op_roll() {
     let program = "OP_4 OP_3 OP_2 OP_1 OP_ROLL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(4), ScriptNum::wrap(2), ScriptNum::wrap(3)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_op_roll_2() {
     let program = "OP_4 OP_3 OP_2 OP_2 OP_ROLL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(3), ScriptNum::wrap(2), ScriptNum::wrap(4)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 fn test_opcode_over() {
     let program = "OP_1 OP_2 OP_OVER";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 3);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 3);
     let expected_dstack = array![ScriptNum::wrap(1), ScriptNum::wrap(2), ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 #[test]
 fn test_opcode_2over() {
     let program = "OP_1 OP_2 OP_3 OP_4 OP_2OVER";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 6);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 6);
     let expected_dstack = array![
         ScriptNum::wrap(1),
         ScriptNum::wrap(2),
@@ -5619,7 +5557,7 @@ fn test_opcode_2over() {
         ScriptNum::wrap(1),
         ScriptNum::wrap(2)
     ];
-    utils::check_expected_dstack(ref engine, expected_dstack.span());
+    check_expected_dstack(ref engine, expected_dstack.span());
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_splice.cairo
@@ -5627,19 +5565,19 @@ fn test_opcode_2over() {
 #[test]
 fn test_op_size_zero_item() {
     let program = "OP_0 OP_SIZE";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 2);
     let expected_stack = array![ScriptNum::wrap(0), ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_size_one_item() {
     let program = "OP_1 OP_SIZE";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 2);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 2);
     let expected_stack = array![ScriptNum::wrap(1), ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 // File: ./packages/engine/src/opcodes/tests/test_arithmetic.cairo
@@ -5647,396 +5585,396 @@ fn test_op_size_one_item() {
 #[test]
 fn test_op_1add() {
     let program = "OP_1 OP_1ADD";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_1sub() {
     let program = "OP_2 OP_1SUB";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_negate_1() {
     let program = "OP_1 OP_NEGATE";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(-1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_negate_0() {
     let program = "OP_0 OP_NEGATE";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_negate_negative() {
     let program = "OP_1 OP_2 OP_SUB OP_NEGATE";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_abs_positive() {
     let program = "OP_2 OP_ABS";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_abs_negative() {
     let program = "OP_0 OP_1SUB OP_ABS";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_abs_zero() {
     let program = "OP_0 OP_ABS";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_not() {
     let program = "OP_1 OP_NOT";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_0_not_equal_one() {
     let program = "OP_1 OP_0NOTEQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_0_not_equal_five() {
     let program = "OP_5 OP_0NOTEQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_0_not_equal_zero() {
     let program = "OP_0 OP_0NOTEQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_add() {
     let program = "OP_1 OP_2 OP_ADD";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(3)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_sub() {
     let program = "OP_1 OP_1 OP_SUB";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 
     let program = "OP_3 OP_1 OP_SUB";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(2)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 
     let program = "OP_1 OP_2 OP_SUB";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(-1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_bool_and_one() {
     let program = "OP_1 OP_3 OP_BOOLAND";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_bool_and_zero() {
     let program = "OP_0 OP_4 OP_BOOLAND";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_bool_or_one() {
     let program = "OP_0 OP_1 OP_BOOLOR";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_bool_or_zero() {
     let program = "OP_0 OP_0 OP_BOOLOR";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_bool_or_both() {
     let program = "OP_1 OP_1 OP_BOOLOR";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_numequal_true() {
     let program = "OP_2 OP_2 OP_NUMEQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_numequal_false() {
     let program = "OP_2 OP_3 OP_NUMEQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_numequalverify_true() {
     let program = "OP_2 OP_2 OP_NUMEQUALVERIFY";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_EMPTY_STACK);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_numequalverify_false() {
     let program = "OP_2 OP_3 OP_NUMEQUALVERIFY";
-    let mut engine = utils::test_compile_and_run_err(program, Error::VERIFY_FAILED);
-    utils::check_dstack_size(ref engine, 0);
+    let mut engine = test_compile_and_run_err(program, Error::VERIFY_FAILED);
+    check_dstack_size(ref engine, 0);
 }
 
 #[test]
 fn test_op_numnotequal_true() {
     let program = "OP_2 OP_3 OP_NUMNOTEQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_numnotequal_false() {
     let program = "OP_3 OP_3 OP_NUMNOTEQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_lessthan() {
     let program = "OP_1 OP_2 OP_LESSTHAN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_lessthan_reverse() {
     let program = "OP_2 OP_1 OP_LESSTHAN";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_lessthan_equal() {
     let program = "OP_1 OP_1 OP_LESSTHAN";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_true() {
     let program = "OP_1 OP_0 OP_GREATERTHAN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_false() {
     let program = "OP_0 OP_1 OP_GREATERTHAN";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_equal_false() {
     let program = "OP_1 OP_1 OP_GREATERTHAN";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_less_than_or_equal_true_for_less_than() {
     let program = "OP_2 OP_3 OP_LESSTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_less_than_or_equal_true_for_equal() {
     let program = "OP_2 OP_2 OP_LESSTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_less_than_or_equal_false_for_greater_than() {
     let program = "OP_3 OP_2 OP_LESSTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_or_equal_true_for_greater_than() {
     let program = "OP_3 OP_2 OP_GREATERTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_or_equal_true_for_equal() {
     let program = "OP_2 OP_2 OP_GREATERTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_greater_than_or_equal_false_for_less_than() {
     let program = "OP_2 OP_3 OP_GREATERTHANOREQUAL";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_min_min_first() {
     let program = "OP_1 OP_2 OP_MIN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_min_min_second() {
     let program = "OP_2 OP_1 OP_MIN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_min_same_value() {
     let program = "OP_1 OP_1 OP_MIN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_max() {
     let program = "OP_1 OP_0 OP_MAX";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_within_true() {
     let program = "OP_1 OP_0 OP_3 OP_WITHIN";
-    let mut engine = utils::test_compile_and_run(program);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run(program);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(1)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 #[test]
 fn test_op_within_false() {
     let program = "OP_2 OP_0 OP_1 OP_WITHIN";
-    let mut engine = utils::test_compile_and_run_err(program, Error::SCRIPT_FAILED);
-    utils::check_dstack_size(ref engine, 1);
+    let mut engine = test_compile_and_run_err(program, Error::SCRIPT_FAILED);
+    check_dstack_size(ref engine, 1);
     let expected_stack = array![ScriptNum::wrap(0)];
-    utils::check_expected_dstack(ref engine, expected_stack.span());
+    check_expected_dstack(ref engine, expected_stack.span());
 }
 
 // File: ./packages/engine/src/opcodes/splice.cairo
@@ -6121,7 +6059,7 @@ pub fn opcode_endif<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252> {
 }
 
 pub fn opcode_verify<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252> {
-    utils::abstract_verify(ref engine)?;
+    abstract_verify(ref engine)?;
     return Result::Ok(());
 }
 
@@ -6320,7 +6258,6 @@ pub mod Opcode {
     pub const OP_NOP9: u8 = 184;
     pub const OP_NOP10: u8 = 185;
 
-    use crate::engine::Engine;
     use crate::transaction::{
         EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
     };
@@ -6344,113 +6281,113 @@ pub mod Opcode {
         opcode: u8, ref engine: Engine<T>
     ) -> Result<(), felt252> {
         match opcode {
-            0 => constants::opcode_false(ref engine),
-            1 => constants::opcode_push_data(1, ref engine),
-            2 => constants::opcode_push_data(2, ref engine),
-            3 => constants::opcode_push_data(3, ref engine),
-            4 => constants::opcode_push_data(4, ref engine),
-            5 => constants::opcode_push_data(5, ref engine),
-            6 => constants::opcode_push_data(6, ref engine),
-            7 => constants::opcode_push_data(7, ref engine),
-            8 => constants::opcode_push_data(8, ref engine),
-            9 => constants::opcode_push_data(9, ref engine),
-            10 => constants::opcode_push_data(10, ref engine),
-            11 => constants::opcode_push_data(11, ref engine),
-            12 => constants::opcode_push_data(12, ref engine),
-            13 => constants::opcode_push_data(13, ref engine),
-            14 => constants::opcode_push_data(14, ref engine),
-            15 => constants::opcode_push_data(15, ref engine),
-            16 => constants::opcode_push_data(16, ref engine),
-            17 => constants::opcode_push_data(17, ref engine),
-            18 => constants::opcode_push_data(18, ref engine),
-            19 => constants::opcode_push_data(19, ref engine),
-            20 => constants::opcode_push_data(20, ref engine),
-            21 => constants::opcode_push_data(21, ref engine),
-            22 => constants::opcode_push_data(22, ref engine),
-            23 => constants::opcode_push_data(23, ref engine),
-            24 => constants::opcode_push_data(24, ref engine),
-            25 => constants::opcode_push_data(25, ref engine),
-            26 => constants::opcode_push_data(26, ref engine),
-            27 => constants::opcode_push_data(27, ref engine),
-            28 => constants::opcode_push_data(28, ref engine),
-            29 => constants::opcode_push_data(29, ref engine),
-            30 => constants::opcode_push_data(30, ref engine),
-            31 => constants::opcode_push_data(31, ref engine),
-            32 => constants::opcode_push_data(32, ref engine),
-            33 => constants::opcode_push_data(33, ref engine),
-            34 => constants::opcode_push_data(34, ref engine),
-            35 => constants::opcode_push_data(35, ref engine),
-            36 => constants::opcode_push_data(36, ref engine),
-            37 => constants::opcode_push_data(37, ref engine),
-            38 => constants::opcode_push_data(38, ref engine),
-            39 => constants::opcode_push_data(39, ref engine),
-            40 => constants::opcode_push_data(40, ref engine),
-            41 => constants::opcode_push_data(41, ref engine),
-            42 => constants::opcode_push_data(42, ref engine),
-            43 => constants::opcode_push_data(43, ref engine),
-            44 => constants::opcode_push_data(44, ref engine),
-            45 => constants::opcode_push_data(45, ref engine),
-            46 => constants::opcode_push_data(46, ref engine),
-            47 => constants::opcode_push_data(47, ref engine),
-            48 => constants::opcode_push_data(48, ref engine),
-            49 => constants::opcode_push_data(49, ref engine),
-            50 => constants::opcode_push_data(50, ref engine),
-            51 => constants::opcode_push_data(51, ref engine),
-            52 => constants::opcode_push_data(52, ref engine),
-            53 => constants::opcode_push_data(53, ref engine),
-            54 => constants::opcode_push_data(54, ref engine),
-            55 => constants::opcode_push_data(55, ref engine),
-            56 => constants::opcode_push_data(56, ref engine),
-            57 => constants::opcode_push_data(57, ref engine),
-            58 => constants::opcode_push_data(58, ref engine),
-            59 => constants::opcode_push_data(59, ref engine),
-            60 => constants::opcode_push_data(60, ref engine),
-            61 => constants::opcode_push_data(61, ref engine),
-            62 => constants::opcode_push_data(62, ref engine),
-            63 => constants::opcode_push_data(63, ref engine),
-            64 => constants::opcode_push_data(64, ref engine),
-            65 => constants::opcode_push_data(65, ref engine),
-            66 => constants::opcode_push_data(66, ref engine),
-            67 => constants::opcode_push_data(67, ref engine),
-            68 => constants::opcode_push_data(68, ref engine),
-            69 => constants::opcode_push_data(69, ref engine),
-            70 => constants::opcode_push_data(70, ref engine),
-            71 => constants::opcode_push_data(71, ref engine),
-            72 => constants::opcode_push_data(72, ref engine),
-            73 => constants::opcode_push_data(73, ref engine),
-            74 => constants::opcode_push_data(74, ref engine),
-            75 => constants::opcode_push_data(75, ref engine),
-            76 => constants::opcode_push_data_x(1, ref engine),
-            77 => constants::opcode_push_data_x(2, ref engine),
-            78 => constants::opcode_push_data_x(4, ref engine),
-            79 => constants::opcode_1negate(ref engine),
-            80 => utils::opcode_reserved("reserved", ref engine),
-            81 => constants::opcode_n(1, ref engine),
-            82 => constants::opcode_n(2, ref engine),
-            83 => constants::opcode_n(3, ref engine),
-            84 => constants::opcode_n(4, ref engine),
-            85 => constants::opcode_n(5, ref engine),
-            86 => constants::opcode_n(6, ref engine),
-            87 => constants::opcode_n(7, ref engine),
-            88 => constants::opcode_n(8, ref engine),
-            89 => constants::opcode_n(9, ref engine),
-            90 => constants::opcode_n(10, ref engine),
-            91 => constants::opcode_n(11, ref engine),
-            92 => constants::opcode_n(12, ref engine),
-            93 => constants::opcode_n(13, ref engine),
-            94 => constants::opcode_n(14, ref engine),
-            95 => constants::opcode_n(15, ref engine),
-            96 => constants::opcode_n(16, ref engine),
-            97 => flow::opcode_nop(ref engine, 97),
-            98 => utils::opcode_reserved("ver", ref engine),
-            99 => flow::opcode_if(ref engine),
-            100 => flow::opcode_notif(ref engine),
-            101 => utils::opcode_reserved("verif", ref engine),
-            102 => utils::opcode_reserved("vernotif", ref engine),
-            103 => flow::opcode_else(ref engine),
-            104 => flow::opcode_endif(ref engine),
-            105 => flow::opcode_verify(ref engine),
-            106 => flow::opcode_return(ref engine),
+            0 => opcode_false(ref engine),
+            1 => opcode_push_data(1, ref engine),
+            2 => opcode_push_data(2, ref engine),
+            3 => opcode_push_data(3, ref engine),
+            4 => opcode_push_data(4, ref engine),
+            5 => opcode_push_data(5, ref engine),
+            6 => opcode_push_data(6, ref engine),
+            7 => opcode_push_data(7, ref engine),
+            8 => opcode_push_data(8, ref engine),
+            9 => opcode_push_data(9, ref engine),
+            10 => opcode_push_data(10, ref engine),
+            11 => opcode_push_data(11, ref engine),
+            12 => opcode_push_data(12, ref engine),
+            13 => opcode_push_data(13, ref engine),
+            14 => opcode_push_data(14, ref engine),
+            15 => opcode_push_data(15, ref engine),
+            16 => opcode_push_data(16, ref engine),
+            17 => opcode_push_data(17, ref engine),
+            18 => opcode_push_data(18, ref engine),
+            19 => opcode_push_data(19, ref engine),
+            20 => opcode_push_data(20, ref engine),
+            21 => opcode_push_data(21, ref engine),
+            22 => opcode_push_data(22, ref engine),
+            23 => opcode_push_data(23, ref engine),
+            24 => opcode_push_data(24, ref engine),
+            25 => opcode_push_data(25, ref engine),
+            26 => opcode_push_data(26, ref engine),
+            27 => opcode_push_data(27, ref engine),
+            28 => opcode_push_data(28, ref engine),
+            29 => opcode_push_data(29, ref engine),
+            30 => opcode_push_data(30, ref engine),
+            31 => opcode_push_data(31, ref engine),
+            32 => opcode_push_data(32, ref engine),
+            33 => opcode_push_data(33, ref engine),
+            34 => opcode_push_data(34, ref engine),
+            35 => opcode_push_data(35, ref engine),
+            36 => opcode_push_data(36, ref engine),
+            37 => opcode_push_data(37, ref engine),
+            38 => opcode_push_data(38, ref engine),
+            39 => opcode_push_data(39, ref engine),
+            40 => opcode_push_data(40, ref engine),
+            41 => opcode_push_data(41, ref engine),
+            42 => opcode_push_data(42, ref engine),
+            43 => opcode_push_data(43, ref engine),
+            44 => opcode_push_data(44, ref engine),
+            45 => opcode_push_data(45, ref engine),
+            46 => opcode_push_data(46, ref engine),
+            47 => opcode_push_data(47, ref engine),
+            48 => opcode_push_data(48, ref engine),
+            49 => opcode_push_data(49, ref engine),
+            50 => opcode_push_data(50, ref engine),
+            51 => opcode_push_data(51, ref engine),
+            52 => opcode_push_data(52, ref engine),
+            53 => opcode_push_data(53, ref engine),
+            54 => opcode_push_data(54, ref engine),
+            55 => opcode_push_data(55, ref engine),
+            56 => opcode_push_data(56, ref engine),
+            57 => opcode_push_data(57, ref engine),
+            58 => opcode_push_data(58, ref engine),
+            59 => opcode_push_data(59, ref engine),
+            60 => opcode_push_data(60, ref engine),
+            61 => opcode_push_data(61, ref engine),
+            62 => opcode_push_data(62, ref engine),
+            63 => opcode_push_data(63, ref engine),
+            64 => opcode_push_data(64, ref engine),
+            65 => opcode_push_data(65, ref engine),
+            66 => opcode_push_data(66, ref engine),
+            67 => opcode_push_data(67, ref engine),
+            68 => opcode_push_data(68, ref engine),
+            69 => opcode_push_data(69, ref engine),
+            70 => opcode_push_data(70, ref engine),
+            71 => opcode_push_data(71, ref engine),
+            72 => opcode_push_data(72, ref engine),
+            73 => opcode_push_data(73, ref engine),
+            74 => opcode_push_data(74, ref engine),
+            75 => opcode_push_data(75, ref engine),
+            76 => opcode_push_data_x(1, ref engine),
+            77 => opcode_push_data_x(2, ref engine),
+            78 => opcode_push_data_x(4, ref engine),
+            79 => opcode_1negate(ref engine),
+            80 => opcode_reserved("reserved", ref engine),
+            81 => opcode_n(1, ref engine),
+            82 => opcode_n(2, ref engine),
+            83 => opcode_n(3, ref engine),
+            84 => opcode_n(4, ref engine),
+            85 => opcode_n(5, ref engine),
+            86 => opcode_n(6, ref engine),
+            87 => opcode_n(7, ref engine),
+            88 => opcode_n(8, ref engine),
+            89 => opcode_n(9, ref engine),
+            90 => opcode_n(10, ref engine),
+            91 => opcode_n(11, ref engine),
+            92 => opcode_n(12, ref engine),
+            93 => opcode_n(13, ref engine),
+            94 => opcode_n(14, ref engine),
+            95 => opcode_n(15, ref engine),
+            96 => opcode_n(16, ref engine),
+            97 => opcode_nop(ref engine, 97),
+            98 => opcode_reserved("ver", ref engine),
+            99 => opcode_if(ref engine),
+            100 => opcode_notif(ref engine),
+            101 => opcode_reserved("verif", ref engine),
+            102 => opcode_reserved("vernotif", ref engine),
+            103 => opcode_else(ref engine),
+            104 => opcode_endif(ref engine),
+            105 => opcode_verify(ref engine),
+            106 => opcode_return(ref engine),
             107 => stack::opcode_toaltstack(ref engine),
             108 => stack::opcode_fromaltstack(ref engine),
             109 => stack::opcode_2drop(ref engine),
@@ -6470,34 +6407,34 @@ pub mod Opcode {
             123 => stack::opcode_rot(ref engine),
             124 => stack::opcode_swap(ref engine),
             125 => stack::opcode_tuck(ref engine),
-            126 => utils::opcode_disabled(ref engine),
-            127 => utils::opcode_disabled(ref engine),
-            128 => utils::opcode_disabled(ref engine),
-            129 => utils::opcode_disabled(ref engine),
+            126 => opcode_disabled(ref engine),
+            127 => opcode_disabled(ref engine),
+            128 => opcode_disabled(ref engine),
+            129 => opcode_disabled(ref engine),
             130 => splice::opcode_size(ref engine),
-            131 => utils::opcode_disabled(ref engine),
-            132 => utils::opcode_disabled(ref engine),
-            133 => utils::opcode_disabled(ref engine),
-            134 => utils::opcode_disabled(ref engine),
+            131 => opcode_disabled(ref engine),
+            132 => opcode_disabled(ref engine),
+            133 => opcode_disabled(ref engine),
+            134 => opcode_disabled(ref engine),
             135 => bitwise::opcode_equal(ref engine),
             136 => bitwise::opcode_equal_verify(ref engine),
-            137 => utils::opcode_reserved("reserved1", ref engine),
-            138 => utils::opcode_reserved("reserved2", ref engine),
+            137 => opcode_reserved("reserved1", ref engine),
+            138 => opcode_reserved("reserved2", ref engine),
             139 => arithmetic::opcode_1add(ref engine),
             140 => arithmetic::opcode_1sub(ref engine),
-            141 => utils::opcode_disabled(ref engine),
-            142 => utils::opcode_disabled(ref engine),
+            141 => opcode_disabled(ref engine),
+            142 => opcode_disabled(ref engine),
             143 => arithmetic::opcode_negate(ref engine),
             144 => arithmetic::opcode_abs(ref engine),
             145 => arithmetic::opcode_not(ref engine),
             146 => arithmetic::opcode_0_not_equal(ref engine),
             147 => arithmetic::opcode_add(ref engine),
             148 => arithmetic::opcode_sub(ref engine),
-            149 => utils::opcode_disabled(ref engine),
-            150 => utils::opcode_disabled(ref engine),
-            151 => utils::opcode_disabled(ref engine),
-            152 => utils::opcode_disabled(ref engine),
-            153 => utils::opcode_disabled(ref engine),
+            149 => opcode_disabled(ref engine),
+            150 => opcode_disabled(ref engine),
+            151 => opcode_disabled(ref engine),
+            152 => opcode_disabled(ref engine),
+            153 => opcode_disabled(ref engine),
             154 => arithmetic::opcode_bool_and(ref engine),
             155 => arithmetic::opcode_bool_or(ref engine),
             156 => arithmetic::opcode_numequal(ref engine),
@@ -6520,17 +6457,17 @@ pub mod Opcode {
             173 => crypto::opcode_checksigverify(ref engine),
             174 => crypto::opcode_checkmultisig(ref engine),
             175 => crypto::opcode_checkmultisigverify(ref engine),
-            176 => flow::opcode_nop(ref engine, 176),
+            176 => opcode_nop(ref engine, 176),
             177 => locktime::opcode_checklocktimeverify(ref engine),
             178 => locktime::opcode_checksequenceverify(ref engine),
-            179 => flow::opcode_nop(ref engine, 179),
-            180 => flow::opcode_nop(ref engine, 180),
-            181 => flow::opcode_nop(ref engine, 181),
-            182 => flow::opcode_nop(ref engine, 182),
-            183 => flow::opcode_nop(ref engine, 183),
-            184 => flow::opcode_nop(ref engine, 184),
-            185 => flow::opcode_nop(ref engine, 185),
-            _ => utils::not_implemented(ref engine)
+            179 => opcode_nop(ref engine, 179),
+            180 => opcode_nop(ref engine, 180),
+            181 => opcode_nop(ref engine, 181),
+            182 => opcode_nop(ref engine, 182),
+            183 => opcode_nop(ref engine, 183),
+            184 => opcode_nop(ref engine, 184),
+            185 => opcode_nop(ref engine, 185),
+            _ => not_implemented(ref engine)
         }
     }
 
@@ -6552,7 +6489,7 @@ pub mod Opcode {
             || opcode == OP_MOD
             || opcode == OP_LSHIFT
             || opcode == OP_RSHIFT {
-            return utils::opcode_disabled(ref engine);
+            return opcode_disabled(ref engine);
         } else {
             return Result::Ok(());
         }
@@ -6562,9 +6499,9 @@ pub mod Opcode {
         opcode: u8, ref engine: Engine<T>
     ) -> Result<(), felt252> {
         if opcode == OP_VERIF {
-            return utils::opcode_reserved("verif", ref engine);
+            return opcode_reserved("verif", ref engine);
         } else if opcode == OP_VERNOTIF {
-            return utils::opcode_reserved("vernotif", ref engine);
+            return opcode_reserved("vernotif", ref engine);
         } else {
             return Result::Ok(());
         }
@@ -6641,8 +6578,8 @@ pub mod Opcode {
 }
 
 // File: ./packages/engine/src/opcodes/crypto.cairo
-    EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
-};
+//     EngineTransactionTrait, EngineTransactionInputTrait, EngineTransactionOutputTrait
+// };
 
 const MAX_KEYS_PER_MULTISIG: i64 = 20;
 
@@ -6866,7 +6803,7 @@ pub fn opcode_checkmultisig<
             break;
         }
         let (parsed_pub_key, parsed_sig, hash_type) = res.unwrap();
-        let sig_hash: u256 = sighash::calc_signature_hash(
+        let sig_hash: u256 = calc_signature_hash(
             @script, hash_type, ref engine.transaction, engine.tx_idx
         );
         if is_valid_signature(sig_hash, parsed_sig.r, parsed_sig.s, parsed_pub_key) {
@@ -6924,7 +6861,7 @@ pub fn opcode_checksigverify<
     ref engine: Engine<T>
 ) -> Result<(), felt252> {
     opcode_checksig(ref engine)?;
-    utils::abstract_verify(ref engine)?;
+    abstract_verify(ref engine)?;
     return Result::Ok(());
 }
 
@@ -6944,7 +6881,7 @@ pub fn opcode_checkmultisigverify<
     ref engine: Engine<T>
 ) -> Result<(), felt252> {
     opcode_checkmultisig(ref engine)?;
-    utils::abstract_verify(ref engine)?;
+    abstract_verify(ref engine)?;
     return Result::Ok(());
 }
 
@@ -7058,7 +6995,7 @@ pub fn opcode_numequal<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252
 
 pub fn opcode_numequalverify<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252> {
     opcode_numequal(ref engine)?;
-    utils::abstract_verify(ref engine)?;
+    abstract_verify(ref engine)?;
     return Result::Ok(());
 }
 
@@ -7200,7 +7137,7 @@ pub fn opcode_equal<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252> {
 
 pub fn opcode_equal_verify<T, +Drop<T>>(ref engine: Engine<T>) -> Result<(), felt252> {
     opcode_equal(ref engine)?;
-    utils::abstract_verify(ref engine)?;
+    abstract_verify(ref engine)?;
     return Result::Ok(());
 }
 
